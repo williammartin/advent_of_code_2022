@@ -51,7 +51,8 @@ macro_rules! impl_output_from {
     };
 }
 
-impl_output_from!{
+impl_output_from! {
+    (USIZE, usize),
     (U8,     u8),
     (U16,    u16),
     (U32,    u32),
@@ -68,6 +69,7 @@ impl_output_from!{
 impl Display for Output {
     fn fmt(&self, f: &mut Formatter<'_>) -> DisplayResult {
         match self {
+            Output::USIZE(v) => write!(f, "{v}"),
             Output::U8(v) => write!(f, "{v}"),
             Output::U16(v) => write!(f, "{v}"),
             Output::U32(v) => write!(f, "{v}"),

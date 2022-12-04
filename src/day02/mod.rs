@@ -4,7 +4,39 @@ pub mod part2;
 
 use crate::{Output, Part};
 
-pub type Input = u8;
+#[derive(Clone, Copy)]
+pub enum Hand {
+    Rock,
+    Paper,
+    Scissors,
+}
+
+pub struct Round {
+    me: Hand,
+    opponent: Hand,
+}
+
+pub enum Outcome {
+    Win,
+    Loss,
+    Draw,
+}
+
+impl Round {
+    pub fn determine_outcome(&self) -> Outcome {
+        match (self.me, self.opponent) {
+            (Hand::Rock, Hand::Paper)
+            | (Hand::Paper, Hand::Scissors)
+            | (Hand::Scissors, Hand::Rock) => Outcome::Loss,
+            (Hand::Rock, Hand::Scissors)
+            | (Hand::Paper, Hand::Rock)
+            | (Hand::Scissors, Hand::Paper) => Outcome::Win,
+            _ => Outcome::Draw,
+        }
+    }
+}
+
+pub type Input = Vec<(String, String)>;
 
 pub fn run(part: Part) -> Output {
     let input = input::read();
