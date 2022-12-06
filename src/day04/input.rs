@@ -7,9 +7,6 @@ const INPUT: &str = include_str!("../../input/04/input.txt");
 pub fn read() -> Input {
     INPUT
         .lines()
-        .map(|line| {
-            line.parse::<AssignmentPair>()
-                .expect("to parse assignment pair correctly")
-        })
+        .flat_map(|line| line.parse::<AssignmentPair>()) // If a result was an error we'd be squashing it here
         .collect()
 }
