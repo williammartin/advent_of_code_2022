@@ -2,12 +2,7 @@ pub mod input;
 pub mod part1;
 pub mod part2;
 
-use std::{
-    borrow::BorrowMut,
-    collections::{hash_map::Entry, HashMap},
-    rc::Rc,
-    str::FromStr,
-};
+use std::str::FromStr;
 
 use crate::{Output, Part};
 
@@ -60,81 +55,150 @@ impl FromStr for Line {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct NodeIndex(usize);
+
 #[derive(Debug)]
-pub struct Directory {
-    parent: Option<Rc<Directory>>,
-    directories: HashMap<String, Directory>,
-    files: Vec<File>,
+pub enum Node {
+    File {
+        name: String,
+        size: u32,
+        parent: NodeIndex,
+    },
+    Directory {
+        name: String,
+        children: Vec<NodeIndex>,
+        parent: NodeIndex,
+    },
 }
 
-impl Directory {
-    fn new(name: &str, parent: Option<Rc<Directory>>) -> Directory {
-        Directory {
-            parent,
-            directories: HashMap::new(),
-            files: Vec::new(),
+#[derive(Debug)]
+pub struct Filesystem(Vec<Node>);
+
+impl Filesystem {
+    fn node_at(&self, i: NodeIndex) -> Option<&Node> {
+        self.0.get(i.0)
+    }
+
+    // Assumption that we never navigate to the same dir twice, and a dir can never have two parents
+    fn add_dir(&mut self, name: String, parent_node_idx: NodeIndex) -> NodeIndex {
+        let insert_idx = self.0.len();
+        let parent_node = self.0.get_mut(parent_node_idx.0).expect(&format!(
+            "to have a node at parent index {:?}",
+            parent_node_idx
+        ));
+
+        match parent_node {
+            Node::File { .. } => panic!("cannot add children to a file"), // probably a better way to avoid this at compilation time
+            Node::Directory { children, .. } => children.push(NodeIndex(insert_idx)),
+        }
+
+        self.0.push(Node::Directory {
+            name,
+            children: vec![],
+            parent: parent_node_idx,
+        });
+
+        NodeIndex(insert_idx)
+    }
+
+    // I'm sure I can reduce this duplication but ehhhh
+    fn add_file(&mut self, name: String, size: u32, parent_node_idx: NodeIndex) -> NodeIndex {
+        let insert_idx = self.0.len();
+        let parent_node = self.0.get_mut(parent_node_idx.0).expect(&format!(
+            "to have a node at parent index {:?}",
+            parent_node_idx
+        ));
+
+        match parent_node {
+            Node::File { .. } => panic!("cannot add children to a file"), // probably a better way to avoid this at compilation time
+            Node::Directory { children, .. } => children.push(NodeIndex(insert_idx)),
+        }
+
+        self.0.push(Node::File {
+            name,
+            size,
+            parent: parent_node_idx,
+        });
+
+        NodeIndex(insert_idx)
+    }
+
+    fn size_of(&self, node_idx: NodeIndex) -> u32 {
+        let node = self
+            .0
+            .get(node_idx.0)
+            .expect(&format!("to have a node at index {:?}", node_idx));
+
+        match node {
+            Node::File { size, .. } => *size,
+            Node::Directory { children, .. } => children
+                .iter()
+                .fold(0, |acc, child_idx| acc + self.size_of(*child_idx)),
         }
     }
 
-    fn add_dir(&mut self, name: &str) -> &mut Directory {
-        let new_dir = Directory::new(name, Some(Rc::new(*self)));
-        self.directories.entry(name.to_owned()).or_insert(new_dir)
-    }
-
-    fn add_file(&mut self, name: String, size: u32) {
-        self.files.push(File {
-            name: name.to_owned(),
-            size,
-        })
+    fn dirs(&self) -> impl Iterator<Item = NodeIndex> + '_ {
+        self.0
+            .iter()
+            .enumerate()
+            .flat_map(|(idx, node)| match node {
+                Node::File { .. } => None,
+                Node::Directory { .. } => Some(NodeIndex(idx)),
+            })
     }
 }
 
-impl FromIterator<Line> for Directory {
+impl FromIterator<Line> for Filesystem {
     fn from_iter<T: IntoIterator<Item = Line>>(iter: T) -> Self {
-        let mut root = Directory::new("/", None);
-        let mut pwd = Rc::new(&mut root);
+        let mut fs = Filesystem(vec![Node::Directory {
+            name: "/".to_owned(),
+            children: Vec::new(),
+            parent: NodeIndex(0), // parent of root is always root
+        }]);
+        let mut current_node_idx: NodeIndex = NodeIndex(0); // Create a filesystem with the root node
 
         for i in iter {
             match i {
                 Line::Command(cmd) => match cmd {
                     Command::ChangeDirectory { to } => {
-                        if to == "/" {
-                            pwd = Rc::new(&mut root);
-                        }
+                        match to.as_str() {
+                            "/" => {
+                                current_node_idx = NodeIndex(0);
+                            }
+                            ".." => {
+                                let current_node = fs
+                                    .node_at(current_node_idx)
+                                    .expect(&format!("to have a node at {:?}", current_node_idx));
 
-                        if to == ".." {
-                            pwd = pwd.parent.expect("to have a parent").borrow_mut();
-                            // pwd_stack.pop(); // ignore popped dir
-                        }
-
-                        let new_dir = pwd_stack
-                            .last_mut()
-                            .expect("to always have a pwd")
-                            .add_dir(to.as_str());
-                        pwd_stack.push(new_dir);
+                                match current_node {
+                                    Node::File { .. } => {
+                                        panic!("files should not be marked as a parent")
+                                    } // probably a better way to avoid this at compilation time
+                                    Node::Directory { parent, .. } => current_node_idx = *parent, // hmm
+                                }
+                            }
+                            dir => {
+                                current_node_idx = fs.add_dir(dir.to_owned(), current_node_idx);
+                            }
+                        };
                     }
                     Command::List => continue,
                 },
                 Line::Directory(name) => {
-                    pwd_stack
-                        .last_mut()
-                        .expect("to always have a pwd")
-                        .add_dir(name.as_str()); // no need to push onto pwd_stack, just noting there is a dir
+                    // do nothing I guess, cause we create lazily on cd
                 }
                 Line::File(file) => {
-                    pwd_stack
-                        .last_mut()
-                        .expect("to always have a pwd")
-                        .add_file(file.name, file.size);
+                    fs.add_file(file.name, file.size, current_node_idx);
                 }
             }
         }
 
-        root
+        fs
     }
 }
 
-pub type Input = Directory;
+pub type Input = Filesystem;
 
 pub fn run(part: Part) -> Output {
     let input = input::read();
