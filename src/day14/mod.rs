@@ -5,6 +5,7 @@ pub mod part2;
 use std::{
     cmp::{max, min},
     collections::HashSet,
+    fmt::Display,
     str::FromStr,
 };
 
@@ -116,6 +117,51 @@ impl Map {
     }
 }
 
+impl Display for Map {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let min_x = self
+            .obstacles
+            .iter()
+            .map(|o| o.x)
+            .min()
+            .expect("to have at least one point");
+        let min_y = self
+            .obstacles
+            .iter()
+            .map(|o| o.y)
+            .min()
+            .expect("to have at least one point");
+
+        let max_x = self
+            .obstacles
+            .iter()
+            .map(|o| o.x)
+            .max()
+            .expect("to have at least one point");
+        let max_y = self
+            .obstacles
+            .iter()
+            .map(|o| o.y)
+            .max()
+            .expect("to have at least one point");
+
+        // for each line
+        for y in min_y..=max_y {
+            // for each cell
+            for x in min_x..=max_x {
+                if self.has_space_at(Point { x, y }) {
+                    write!(f, ".")?
+                } else {
+                    write!(f, "#")?
+                }
+            }
+            writeln!(f)?
+        }
+
+        Ok(())
+    }
+}
+
 impl FromIterator<Point> for Map {
     fn from_iter<T: IntoIterator<Item = Point>>(iter: T) -> Self {
         let mut map = Map::new();
@@ -137,6 +183,7 @@ impl Default for Map {
     }
 }
 
+#[derive(Debug)]
 pub struct FlooredMap {
     map: Map,
     floor_y: u16,
@@ -166,6 +213,65 @@ impl FlooredMap {
         } else {
             self.map.has_space_at(p)
         }
+    }
+}
+
+impl Display for FlooredMap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.map);
+
+        let min_x = self
+            .map
+            .obstacles
+            .iter()
+            .map(|o| o.x)
+            .min()
+            .expect("to have at least one point");
+
+        let max_x = self
+            .map
+            .obstacles
+            .iter()
+            .map(|o| o.x)
+            .max()
+            .expect("to have at least one point");
+
+        // create new points for our predicted lines
+        let predicted_lines = vec![
+            Line {
+                start: Point {
+                    x: min_x,
+                    y: self.floor_y - 1,
+                },
+                end: Point {
+                    x: max_x,
+                    y: self.floor_y - 1,
+                },
+            },
+            Line {
+                start: Point {
+                    x: min_x,
+                    y: self.floor_y,
+                },
+                end: Point {
+                    x: max_x,
+                    y: self.floor_y,
+                },
+            },
+        ];
+
+        for line in predicted_lines {
+            for point in line.points() {
+                if self.has_space_at(point) {
+                    write!(f, ".")?
+                } else {
+                    write!(f, "#")?
+                }
+            }
+            writeln!(f)?
+        }
+
+        Ok(())
     }
 }
 
