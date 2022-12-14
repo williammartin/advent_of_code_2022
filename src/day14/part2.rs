@@ -9,7 +9,7 @@ pub fn solve(points: &Input) -> Output {
     let mut resting_sand_counter = 0; // we could have the obstacle be a rock wall or sand enum and then count but that seems extra
     while let Some(mut path) = find_resting_point_for_sand(&map, path_taken.clone()) {
         // while we have a resting point, insert it as an obstacle
-        map.insert_obstacle_at(path.pop().expect("to have an obstacle"));
+        map.insert_sand_at(path.pop().expect("to have an obstacle"));
         // and increment our counter
         resting_sand_counter = resting_sand_counter + 1;
         path_taken = path;

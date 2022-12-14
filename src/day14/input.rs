@@ -2,7 +2,7 @@ use std::{collections::HashSet, str::FromStr};
 
 use crate::day14::Input;
 
-use super::{Line, Map, Obstacle, Point};
+use super::{Line, Map, Point};
 
 const INPUT: &str = include_str!("../../input/14/input.txt");
 

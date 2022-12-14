@@ -1,4 +1,4 @@
-use crate::day14::{Input, Obstacle, Output};
+use crate::day14::{Input, Output};
 
 use super::{Map, Point};
 
@@ -9,7 +9,7 @@ pub fn solve(points: &Input) -> Output {
     let mut resting_sand_counter = 0; // we could have the obstacle be a rock wall or sand enum and then count but that seems extra
     while let Some(p) = find_resting_point_for_sand(&map, sand_starting_point) {
         // while we have a resting point, insert it as an obstacle
-        map.insert_obstacle_at(p);
+        map.insert_sand_at(p);
         // and increment our counter
         resting_sand_counter = resting_sand_counter + 1;
     }

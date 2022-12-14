@@ -4,7 +4,7 @@ pub mod part2;
 
 use std::{
     cmp::{max, min},
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     fmt::Display,
     str::FromStr,
 };
@@ -86,28 +86,51 @@ impl Line {
     }
 }
 
-pub type Obstacle = Point;
+#[derive(Debug)]
+pub enum ObstacleType {
+    Rock,
+    Sand,
+}
+
+impl Display for ObstacleType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ObstacleType::Rock => write!(f, "#")?,
+            ObstacleType::Sand => write!(f, "o")?,
+        }
+
+        Ok(())
+    }
+}
 
 #[derive(Debug)]
 pub struct Map {
-    obstacles: HashSet<Obstacle>,
+    obstacles: HashMap<Point, ObstacleType>,
     void_begins_at: u16,
 }
 
 impl Map {
     fn new() -> Map {
         Map {
-            obstacles: HashSet::new(),
+            obstacles: HashMap::new(),
             void_begins_at: 0,
         }
     }
 
-    fn insert_obstacle_at(&mut self, o: Obstacle) {
-        self.obstacles.insert(o);
+    fn insert_rock_at(&mut self, p: Point) {
+        self.obstacles.insert(p, ObstacleType::Rock);
+    }
+
+    fn insert_sand_at(&mut self, p: Point) {
+        self.obstacles.insert(p, ObstacleType::Sand);
     }
 
     fn has_space_at(&self, p: Point) -> bool {
-        !self.obstacles.contains(&p)
+        !self.obstacles.contains_key(&p)
+    }
+
+    fn obstacle_at(&self, p: Point) -> Option<&ObstacleType> {
+        self.obstacles.get(&p)
     }
 
     fn in_void(&self, p: Point) -> bool {
@@ -121,26 +144,26 @@ impl Display for Map {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let min_x = self
             .obstacles
-            .iter()
+            .keys()
             .map(|o| o.x)
             .min()
             .expect("to have at least one point");
         let min_y = self
             .obstacles
-            .iter()
+            .keys()
             .map(|o| o.y)
             .min()
             .expect("to have at least one point");
 
         let max_x = self
             .obstacles
-            .iter()
+            .keys()
             .map(|o| o.x)
             .max()
             .expect("to have at least one point");
         let max_y = self
             .obstacles
-            .iter()
+            .keys()
             .map(|o| o.y)
             .max()
             .expect("to have at least one point");
@@ -149,10 +172,10 @@ impl Display for Map {
         for y in min_y..=max_y {
             // for each cell
             for x in min_x..=max_x {
-                if self.has_space_at(Point { x, y }) {
-                    write!(f, ".")?
+                if let Some(o) = self.obstacle_at(Point { x, y }) {
+                    write!(f, "{}", o)?
                 } else {
-                    write!(f, "#")?
+                    write!(f, ".")?
                 }
             }
             writeln!(f)?
@@ -167,7 +190,7 @@ impl FromIterator<Point> for Map {
         let mut map = Map::new();
 
         for p in iter {
-            map.insert_obstacle_at(p);
+            map.insert_rock_at(p);
             if p.y > map.void_begins_at {
                 map.void_begins_at = p.y;
             }
@@ -196,17 +219,23 @@ impl FlooredMap {
         FlooredMap { map, floor_y }
     }
 
-    fn insert_obstacle_at(&mut self, o: Obstacle) {
-        self.map.insert_obstacle_at(o);
+    fn insert_rock_at(&mut self, p: Point) {
+        self.map.insert_rock_at(p);
+    }
+
+    fn insert_sand_at(&mut self, p: Point) {
+        self.map.insert_sand_at(p);
+    }
+
+    fn obstacle_at(&self, p: Point) -> Option<&ObstacleType> {
+        if p.y == self.floor_y {
+            Some(&ObstacleType::Rock)
+        } else {
+            self.map.obstacle_at(p)
+        }
     }
 
     fn has_space_at(&self, p: Point) -> bool {
-        // As this is a floored map, we need to assume there is no space if we
-        // reach max y of our current obstacles + 2.
-
-        // look at all the points, map them to their y coord, and choose the largest.
-        // this indicates where the bottom of our map is, so add 2 to predict where the floor is
-
         // if we have equality, then this point is _on_ the floor
         if p.y == self.floor_y {
             false
@@ -223,7 +252,7 @@ impl Display for FlooredMap {
         let min_x = self
             .map
             .obstacles
-            .iter()
+            .keys()
             .map(|o| o.x)
             .min()
             .expect("to have at least one point");
@@ -231,7 +260,7 @@ impl Display for FlooredMap {
         let max_x = self
             .map
             .obstacles
-            .iter()
+            .keys()
             .map(|o| o.x)
             .max()
             .expect("to have at least one point");
@@ -262,10 +291,10 @@ impl Display for FlooredMap {
 
         for line in predicted_lines {
             for point in line.points() {
-                if self.has_space_at(point) {
-                    write!(f, ".")?
+                if let Some(o) = self.obstacle_at(point) {
+                    write!(f, "{}", o)?
                 } else {
-                    write!(f, "#")?
+                    write!(f, ".")?
                 }
             }
             writeln!(f)?
